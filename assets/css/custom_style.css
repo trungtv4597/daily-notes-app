@@ -1,0 +1,75 @@
+/* Custom CSS for Daily Notes Streamlit App */
+
+/* Main app styling */
+.main .block-container {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+}
+
+/* Header styling */
+h1 {
+    color: #1f77b4;
+    border-bottom: 2px solid #1f77b4;
+    padding-bottom: 0.5rem;
+}
+
+/* Note cards styling */
+.stExpander {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+.stExpander > div > div > div > div {
+    background-color: #f8f9fa;
+}
+
+/* Button styling */
+.stButton > button {
+    background-color: #1f77b4;
+    color: white;
+    border-radius: 6px;
+    border: none;
+    padding: 0.5rem 1rem;
+    font-weight: 500;
+}
+
+.stButton > button:hover {
+    background-color: #1565c0;
+    border: none;
+}
+
+/* Text area styling */
+.stTextArea > div > div > textarea {
+    border-radius: 6px;
+    border: 2px solid #e0e0e0;
+}
+
+.stTextArea > div > div > textarea:focus {
+    border-color: #1f77b4;
+    box-shadow: 0 0 0 2px rgba(31, 119, 180, 0.2);
+}
+
+/* Success/Error message styling */
+.stSuccess {
+    background-color: #d4edda;
+    border: 1px solid #c3e6cb;
+    border-radius: 6px;
+}
+
+.stError {
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    border-radius: 6px;
+}
+
+/* Sidebar styling */
+.css-1d391kg {
+    background-color: #f0f2f6;
+}
+
+/* Custom spacing */
+.custom-spacing {
+    margin-top: 2rem;
+    margin-bottom: 2rem;
+}

@@ -1,0 +1,53 @@
+[global]
+# Global configuration options
+
+# Development mode (set to false for production)
+developmentMode = false
+
+# Show warning when running in development mode
+showWarningOnDirectExecution = true
+
+[server]
+# Server configuration
+port = 8501
+baseUrlPath = ""
+enableCORS = true
+enableXsrfProtection = true
+maxUploadSize = 200
+maxMessageSize = 200
+enableWebsocketCompression = false
+
+# Address to bind to
+address = "localhost"
+
+[browser]
+# Browser configuration
+gatherUsageStats = false
+
+[theme]
+# Theme configuration
+primaryColor = "#1f77b4"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f0f2f6"
+textColor = "#262730"
+font = "sans serif"
+
+[client]
+# Client configuration
+caching = true
+displayEnabled = true
+showErrorDetails = true
+
+[runner]
+# Runner configuration
+magicEnabled = true
+installTracer = false
+fixMatplotlib = true
+postScriptGC = true
+fastReruns = true
+enforceSerializableSessionState = false
+
+[logger]
+# Logging configuration
+level = "info"
+messageFormat = "%(asctime)s.%(msecs)03d %(name)s: %(levelname)s: %(message)s"

@@ -1,0 +1,18 @@
+# Core dependencies
+streamlit==1.28.1
+psycopg2-binary==2.9.7
+toml==0.10.2
+pandas==2.1.1
+
+# Authentication dependencies
+bcrypt==4.0.1
+
+# Testing dependencies
+pytest==7.4.2
+pytest-cov==4.1.0
+pytest-mock==3.11.1
+
+# Development dependencies
+black==23.9.1
+flake8==6.1.0
+mypy==1.6.1
