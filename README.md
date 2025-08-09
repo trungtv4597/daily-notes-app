@@ -24,6 +24,33 @@ A well-organized Streamlit web application for logging daily accomplishments and
 
 ## Setup Instructions
 
+
+### 0. Create and activate a virtual environment (recommended)
+
+Windows PowerShell:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -U pip
+```
+
+Windows cmd:
+
+```bat
+python -m venv .venv
+.\.venv\Scripts\activate.bat
+python -m pip install -U pip
+```
+
+Git Bash:
+
+```bash
+python -m venv .venv
+source .venv/Scripts/activate
+python -m pip install -U pip
+```
+
 ### 1. Clone and Navigate to Project
 ```bash
 cd performance-emailer

@@ -98,12 +98,17 @@ class TestDatabaseManager(unittest.TestCase):
     @patch.object(DatabaseManager, 'get_connection')
     def test_test_connection_success(self, mock_get_connection):
         """Test successful connection test."""
-        mock_conn = Mock()
+        # Use MagicMock to support context manager protocol
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
         mock_get_connection.return_value = mock_conn
-        
+
         result = self.db_manager.test_connection()
-        
+
         self.assertTrue(result)
+        # Ensure cursor context manager used and connection closed
+        mock_conn.cursor.assert_called()
         mock_conn.close.assert_called_once()
     
     @patch.object(DatabaseManager, 'get_connection')
@@ -118,9 +123,9 @@ class TestDatabaseManager(unittest.TestCase):
     @patch.object(DatabaseManager, 'get_connection')
     def test_get_all_users_success(self, mock_get_connection):
         """Test successful retrieval of all users."""
-        # Mock database connection and cursor
-        mock_conn = Mock()
-        mock_cursor = Mock()
+        # Mock database connection and cursor (supports context manager)
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
         mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
         mock_get_connection.return_value = mock_conn
         
@@ -149,9 +154,9 @@ class TestDatabaseManager(unittest.TestCase):
     @patch.object(DatabaseManager, 'get_connection')
     def test_save_note_success(self, mock_get_connection):
         """Test successful note saving."""
-        # Mock database connection and cursor
-        mock_conn = Mock()
-        mock_cursor = Mock()
+        # Mock database connection and cursor (supports context manager)
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
         mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
         mock_get_connection.return_value = mock_conn
         
@@ -173,9 +178,9 @@ class TestDatabaseManager(unittest.TestCase):
     @patch.object(DatabaseManager, 'get_connection')
     def test_create_user_success(self, mock_get_connection):
         """Test successful user creation."""
-        # Mock database connection and cursor
-        mock_conn = Mock()
-        mock_cursor = Mock()
+        # Mock database connection and cursor (supports context manager)
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
         mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
         mock_get_connection.return_value = mock_conn
         

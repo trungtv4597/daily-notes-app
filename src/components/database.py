@@ -36,11 +36,37 @@ class DatabaseManager:
     """Manages database connections and operations."""
 
     def __init__(self):
-        # Priority order: Streamlit secrets (runtime) > secrets.toml (local) > environment variables (fallback)
+        # Priority order (local/tests first): secrets.toml > environment variables > Streamlit secrets (fallback)
         self.connection_params = None
 
-        # 1. Try Streamlit secrets first (for cloud deployment)
-        if STREAMLIT_AVAILABLE and hasattr(st, 'secrets') and 'database' in st.secrets:
+        # 1. Try secrets.toml file (for local development and tests)
+        secrets = load_secrets_from_toml()
+        if secrets and 'database' in secrets:
+            db_config = secrets['database']
+            self.connection_params = {
+                'host': db_config.get('DB_HOST'),
+                'database': db_config.get('DB_NAME'),
+                'user': db_config.get('DB_USER'),
+                'password': db_config.get('DB_PASSWORD'),
+                'port': db_config.get('DB_PORT', 5432)
+            }
+            print("Using secrets.toml for database configuration")
+
+        # 2. Fallback to environment variables (legacy support)
+        if not self.connection_params or not all(self.connection_params.values()):
+            self.connection_params = {
+                'host': os.getenv('DB_HOST'),
+                'database': os.getenv('DB_NAME'),
+                'user': os.getenv('DB_USER'),
+                'password': os.getenv('DB_PASSWORD'),
+                'port': os.getenv('DB_PORT', 5432)
+            }
+            if all(self.connection_params.values()):
+                print("Using environment variables for database configuration")
+
+        # 3. Fallback to Streamlit secrets (for cloud deployment)
+        if (not self.connection_params or not all(self.connection_params.values())) \
+           and STREAMLIT_AVAILABLE and hasattr(st, 'secrets') and 'database' in st.secrets:
             self.connection_params = {
                 'host': st.secrets.database.DB_HOST,
                 'database': st.secrets.database.DB_NAME,
@@ -50,47 +76,22 @@ class DatabaseManager:
             }
             print("Using Streamlit secrets for database configuration")
 
-        # 2. Try secrets.toml file (for local development)
-        elif not self.connection_params:
-            secrets = load_secrets_from_toml()
-            if secrets and 'database' in secrets:
-                db_config = secrets['database']
-                self.connection_params = {
-                    'host': db_config.get('DB_HOST'),
-                    'database': db_config.get('DB_NAME'),
-                    'user': db_config.get('DB_USER'),
-                    'password': db_config.get('DB_PASSWORD'),
-                    'port': db_config.get('DB_PORT', 5432)
-                }
-                print("Using secrets.toml for database configuration")
-
-        # 3. Fallback to environment variables (legacy support)
-        if not self.connection_params or not all(self.connection_params.values()):
-            self.connection_params = {
-                'host': os.getenv('DB_HOST'),
-                'database': os.getenv('DB_NAME'),
-                'user': os.getenv('DB_USER'),
-                'password': os.getenv('DB_PASSWORD'),
-                'port': os.getenv('DB_PORT', 5432)
-            }
-            print("Using environment variables for database configuration")
-
         # Validate that we have all required parameters
         if not all([self.connection_params.get('host'),
                    self.connection_params.get('database'),
                    self.connection_params.get('user'),
                    self.connection_params.get('password')]):
             raise ValueError("Missing required database configuration parameters. Please check your secrets.toml file or environment variables.")
-    
+
     def get_connection(self):
         """Create and return a database connection."""
         try:
             conn = psycopg2.connect(**self.connection_params)
             return conn
-        except psycopg2.Error as e:
+        except Exception as e:
             st.error(f"Database connection error: {e}")
             return None
-    
+
     def create_tables(self):
         """Create the app_users and notes tables if they don't exist."""
         create_app_users_table = """
@@ -142,17 +143,17 @@ class DatabaseManager:
             finally:
                 conn.close()
         return False
-    
+
     def insert_sample_users(self):
         """Insert sample users for the PoC."""
         sample_users = [
             "Alice Johnson",
-            "Bob Smith", 
+            "Bob Smith",
             "Carol Davis",
             "David Wilson",
             "Emma Brown"
         ]
-        
+
         conn = self.get_connection()
         if conn:
             try:
@@ -171,7 +172,7 @@ class DatabaseManager:
             finally:
                 conn.close()
         return False
-    
+
     def create_user_with_auth(self, username: str, email: str, password_hash: str, display_name: str) -> Optional[int]:
         """Create a new user with authentication credentials."""
         conn = self.get_connection()
@@ -294,7 +295,27 @@ class DatabaseManager:
             finally:
                 conn.close()
         return []
-    
+
+    def create_user(self, display_name: str, email: str) -> bool:
+        """Create a simple user record for PoC paths without auth fields."""
+        conn = self.get_connection()
+        if conn:
+            try:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        "INSERT INTO app_users (username, email, password_hash, display_name) VALUES (%s, %s, %s, %s)",
+                        (display_name.lower().replace(" ", "_"), email, "", display_name)
+                    )
+                    conn.commit()
+                    return True
+            except psycopg2.Error as e:
+                st.error(f"Error creating user: {e}")
+                conn.rollback()
+                return False
+            finally:
+                conn.close()
+        return False
+
     def save_note(self, user_id: int, content: str) -> bool:
         """Save a new note for a user."""
         conn = self.get_connection()
@@ -314,7 +335,7 @@ class DatabaseManager:
             finally:
                 conn.close()
         return False
-    
+
     def get_weekly_notes(self, user_id: int) -> List[Dict]:
         """Get notes for the current week for a specific user."""
         # Calculate the start of the current week (Monday)
@@ -322,15 +343,15 @@ class DatabaseManager:
         days_since_monday = today.weekday()
         week_start = today - timedelta(days=days_since_monday)
         week_end = week_start + timedelta(days=6)
-        
+
         conn = self.get_connection()
         if conn:
             try:
                 with conn.cursor(cursor_factory=RealDictCursor) as cursor:
                     cursor.execute("""
-                        SELECT content, created_at 
-                        FROM notes 
-                        WHERE user_id = %s 
+                        SELECT content, created_at
+                        FROM notes
+                        WHERE user_id = %s
                         AND DATE(created_at) BETWEEN %s AND %s
                         ORDER BY created_at DESC
                     """, (user_id, week_start, week_end))

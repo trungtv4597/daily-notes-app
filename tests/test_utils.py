@@ -109,7 +109,7 @@ class TestTruncateText(unittest.TestCase):
         """Test truncation of text longer than max length."""
         long_text = "This is a very long text that should be truncated"
         result = truncate_text(long_text, 20)
-        self.assertEqual(result, "This is a very l...")
+        self.assertEqual(result, "This is a very lo...")
         self.assertEqual(len(result), 20)
     
     def test_exact_length(self):
