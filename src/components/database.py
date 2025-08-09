@@ -93,7 +93,7 @@ class DatabaseManager:
             return None
 
     def create_tables(self):
-        """Create the app_users and notes tables if they don't exist."""
+        """Create required tables if they don't exist."""
         create_app_users_table = """
         CREATE TABLE IF NOT EXISTS app_users (
             id SERIAL PRIMARY KEY,
@@ -104,7 +104,9 @@ class DatabaseManager:
             is_active BOOLEAN DEFAULT TRUE,
             created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-            last_login TIMESTAMP WITHOUT TIME ZONE
+            last_login TIMESTAMP WITHOUT TIME ZONE,
+            manager_name VARCHAR(100),
+            manager_email VARCHAR(255)
         );
         """
 
@@ -114,6 +116,20 @@ class DatabaseManager:
             user_id INTEGER REFERENCES app_users(id) ON DELETE CASCADE,
             content TEXT NOT NULL,
             created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+        """
+
+        create_sent_emails_table = """
+        CREATE TABLE IF NOT EXISTS sent_emails (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER REFERENCES app_users(id) ON DELETE CASCADE,
+            to_email VARCHAR(255) NOT NULL,
+            subject TEXT NOT NULL,
+            body TEXT NOT NULL,
+            status VARCHAR(32) NOT NULL DEFAULT 'queued',
+            error_message TEXT,
+            created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
         );
         """
 
@@ -132,6 +148,7 @@ class DatabaseManager:
                 with conn.cursor() as cursor:
                     cursor.execute(create_app_users_table)
                     cursor.execute(create_notes_table)
+                    cursor.execute(create_sent_emails_table)
                     cursor.execute(create_username_index)
                     cursor.execute(create_email_index)
                     conn.commit()
@@ -419,6 +436,106 @@ class DatabaseManager:
             finally:
                 conn.close()
         return False
+
+    def get_manager_info(self, user_id: int) -> Optional[Dict]:
+        """Get manager (boss) name and email for a user."""
+        conn = self.get_connection()
+        if conn:
+            try:
+                with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                    cursor.execute(
+                        """
+                        SELECT manager_name, manager_email
+                        FROM app_users
+                        WHERE id = %s AND is_active = TRUE
+                        """,
+                        (user_id,),
+                    )
+                    row = cursor.fetchone()
+                    return dict(row) if row else None
+            except psycopg2.Error as e:
+                st.error(f"Error fetching manager info: {e}")
+                return None
+            finally:
+                conn.close()
+        return None
+
+    def update_manager_info(self, user_id: int, manager_name: str, manager_email: str) -> bool:
+        """Update manager (boss) name and email for a user."""
+        conn = self.get_connection()
+        if conn:
+            try:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        UPDATE app_users
+                        SET manager_name = %s, manager_email = %s, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = %s AND is_active = TRUE
+                        """,
+                        (manager_name, manager_email, user_id),
+                    )
+                    conn.commit()
+                    return cursor.rowcount > 0
+            except psycopg2.Error as e:
+                st.error(f"Error updating manager info: {e}")
+                conn.rollback()
+                return False
+            finally:
+                conn.close()
+        return False
+
+    def save_sent_email(self, user_id: int, to_email: str, subject: str, body: str, status: str = 'queued') -> Optional[int]:
+        """Persist an email send record and return its id."""
+        conn = self.get_connection()
+        if conn:
+            try:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        INSERT INTO sent_emails (user_id, to_email, subject, body, status)
+                        VALUES (%s, %s, %s, %s, %s)
+                        RETURNING id
+                        """,
+                        (user_id, to_email, subject, body, status),
+                    )
+                    email_id = cursor.fetchone()[0]
+                    conn.commit()
+                    return email_id
+            except psycopg2.Error as e:
+                st.error(f"Error saving sent email record: {e}")
+                conn.rollback()
+                return None
+            finally:
+                conn.close()
+        return None
+
+    def update_sent_email_status(self, email_id: int, status: str, error_message: Optional[str] = None) -> bool:
+        """Update status (and optional error) of a sent email record."""
+        conn = self.get_connection()
+        if conn:
+            try:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        UPDATE sent_emails
+                        SET status = %s,
+                            error_message = %s,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE id = %s
+                        """,
+                        (status, error_message, email_id),
+                    )
+                    conn.commit()
+                    return cursor.rowcount > 0
+            except psycopg2.Error as e:
+                st.error(f"Error updating sent email status: {e}")
+                conn.rollback()
+                return False
+            finally:
+                conn.close()
+        return False
+
+
 
 # Global database manager instance
 db_manager = DatabaseManager()

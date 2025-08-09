@@ -263,6 +263,10 @@ These scripts were moved to the archive to keep the root directory clean while p
 - Export notes to PDF or CSV
 - Search and filter functionality
 - Rich text formatting
-- Mobile app version
 - Email notifications
 - Data visualization improvements
+
+
+## Backlog
+
+- Email sending from Summary page (implemented draft → confirm recipient → persist approved email → SMTP send → success/fail feedback). Paused for now while SMTP configuration and delivery paths are finalized.
