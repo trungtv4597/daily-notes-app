@@ -1,129 +1,79 @@
 """
-Settings page for Daily Notes application.
-Manage application settings and user preferences.
+Settings page (rebuilt): manage app-level settings.
+First focus: allow the user to set their boss/manager name and email, stored in Postgres (app_users table).
 """
-import streamlit as st
-import sys
 import os
+import sys
+import streamlit as st
 
 # Add the parent directory to the path to import from src
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.components.database import db_manager
-from src.calculations.utils import format_error_message
-from src.components.auth_ui import require_authentication, get_current_user_info, show_user_profile, validate_note_content
+from src.components.auth_ui import require_authentication, get_current_user_info  # type: ignore
+from src.components.database import db_manager  # type: ignore
 
 st.set_page_config(
-    page_title="Settings - Daily Notes",
+    page_title="Settings",
     page_icon="⚙️",
-    layout="wide"
+    layout="wide",
 )
 
-def manage_users():
-    """User management section."""
-    st.subheader("👥 User Management")
-    
-    # Display current users
-    try:
-        users = db_manager.get_all_users()
-        if users:
-            st.write("**Current Users:**")
-            for user in users:
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.write(f"• {user['name']} ({user['email']})")
-                with col2:
-                    if st.button(f"Delete", key=f"delete_{user['id']}", type="secondary"):
-                        # Note: In a real app, you'd want confirmation dialog
-                        st.warning("Delete functionality would be implemented here.")
-        else:
-            st.info("No users found.")
-    except Exception as e:
-        st.error(f"Failed to load users: {format_error_message(e)}")
-    
-    # Add new user form
-    st.markdown("---")
-    st.write("**Add New User:**")
-    
-    with st.form("add_user_form"):
-        new_name = st.text_input("Name")
-        new_email = st.text_input("Email")
-        
-        if st.form_submit_button("Add User"):
-            if new_name and new_email:
-                try:
-                    if db_manager.create_user(new_name, new_email):
-                        st.success(f"✅ User '{new_name}' added successfully!")
-                        st.rerun()
-                    else:
-                        st.error("❌ Failed to add user.")
-                except Exception as e:
-                    st.error(f"❌ Error adding user: {format_error_message(e)}")
-            else:
-                st.error("Please fill in both name and email.")
 
-def app_settings():
-    """Application settings section."""
-    st.subheader("🔧 Application Settings")
-    
-    # Note validation settings
-    st.write("**Note Validation Settings:**")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        min_length = st.number_input("Minimum note length", min_value=1, max_value=100, value=5)
-    with col2:
-        max_length = st.number_input("Maximum note length", min_value=100, max_value=10000, value=5000)
-    
-    # Display settings
-    st.write("**Display Settings:**")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        show_timestamps = st.checkbox("Show detailed timestamps", value=True)
-    with col2:
-        notes_per_page = st.number_input("Notes per page", min_value=5, max_value=50, value=10)
-    
-    # Database settings
-    st.write("**Database Settings:**")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("Test Database Connection"):
-            if db_manager.test_connection():
-                st.success("✅ Database connection successful!")
-            else:
-                st.error("❌ Database connection failed!")
-    
-    with col2:
-        if st.button("Initialize Database"):
-            try:
-                db_manager.create_tables()
-                st.success("✅ Database tables initialized!")
-            except Exception as e:
-                st.error(f"❌ Database initialization failed: {format_error_message(e)}")
+def is_valid_email(email: str) -> bool:
+    email = (email or "").strip()
+    return "@" in email and "." in email.split("@")[-1]
+
 
 def main():
-    # Require authentication first
     if not require_authentication():
         return
 
     st.title("⚙️ Settings")
-    st.markdown("Manage your Daily Notes application settings and profile.")
+    st.caption("Configure who receives your weekly performance emails (saved to your profile).")
 
-    # Test database connection
-    if not db_manager.test_connection():
-        st.error("❌ Cannot connect to the database. Please check your connection settings.")
+    # Ensure schema is up to date (adds manager columns if missing)
+    try:
+        db_manager.create_tables()
+    except Exception:
+        pass
+
+    user = get_current_user_info()
+    if not user or not user.get("id"):
+        st.error("Unable to determine the current user. Please log in again.")
         return
 
-    # Create tabs for different settings sections
-    tab1, tab2 = st.tabs(["👤 Profile", "🔧 Application"])
+    # Load current manager info from DB
+    current_name = ""
+    current_email = ""
+    try:
+        mgr = db_manager.get_manager_info(user["id"]) or {}
+        current_name = (mgr.get("manager_name") or "").strip()
+        current_email = (mgr.get("manager_email") or "").strip()
+    except Exception as e:
+        st.warning("Could not load existing manager info. If this is a new database, the fields may not exist yet.")
 
-    with tab1:
-        show_user_profile()
+    with st.form("boss_settings_form"):
+        boss_name = st.text_input("Boss/Manager full name", value=current_name, placeholder="e.g., Jane Doe")
+        boss_email = st.text_input("Boss/Manager email", value=current_email, placeholder="e.g., jane.doe@company.com")
+        submitted = st.form_submit_button("Save", type="primary")
 
-    with tab2:
-        app_settings()
+    if submitted:
+        if not boss_name.strip():
+            st.error("Please enter your boss's full name.")
+            return
+        if not is_valid_email(boss_email):
+            st.error("Please enter a valid email address.")
+            return
+        try:
+            ok = db_manager.update_manager_info(user["id"], boss_name.strip(), boss_email.strip())
+            if ok:
+                st.success("Boss details saved to your profile in the database.")
+                st.rerun()
+            else:
+                st.error("Failed to save manager information. Please try again.")
+        except Exception as e:
+            st.error(f"Error saving manager information: {e}")
+
 
 if __name__ == "__main__":
     main()
