@@ -63,21 +63,21 @@ pip install -r requirements.txt
 
 ### 3. Secrets Configuration
 The application uses a centralized secrets management system via `.streamlit/secrets.toml`.
-This file is already configured with your database credentials:
+Create this file locally and add your own values (never commit real secrets to git):
 
 ```toml
 [database]
-DB_HOST = "[REDACTED_HOST]"
-DB_NAME = "daily_notes_app_db"
-DB_USER = "postgres"
-DB_PASSWORD = "[REDACTED_PASSWORD]"
+DB_HOST = "<your_db_host>"
+DB_NAME = "<your_db_name>"
+DB_USER = "<your_db_user>"
+DB_PASSWORD = "<your_db_password>"
 DB_PORT = "5432"
 ```
 
 **Important**:
-- The `secrets.toml` file is automatically ignored by git for security
-- Never commit secrets to version control
-- The application will automatically use this configuration for both local development and deployment
+- `.streamlit/secrets.toml` is ignored by git for security
+- Never commit secrets to version control; use placeholders in docs
+- Update your local secrets.toml and keep it private for both local development and deployment
 
 ### 4. Initialize Database
 Run the database initialization script to create tables and populate sample users:
