@@ -115,7 +115,29 @@ class DatabaseManager:
             id SERIAL PRIMARY KEY,
             user_id INTEGER REFERENCES app_users(id) ON DELETE CASCADE,
             content TEXT NOT NULL,
+            note_date DATE DEFAULT CURRENT_DATE,
             created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+        """
+
+        create_tags_table = """
+        CREATE TABLE IF NOT EXISTS tags (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER REFERENCES app_users(id) ON DELETE CASCADE,
+            name VARCHAR(50) NOT NULL,
+            color VARCHAR(7) DEFAULT '#1f77b4',
+            created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_id, name)
+        );
+        """
+
+        create_note_tags_table = """
+        CREATE TABLE IF NOT EXISTS note_tags (
+            id SERIAL PRIMARY KEY,
+            note_id INTEGER REFERENCES notes(id) ON DELETE CASCADE,
+            tag_id INTEGER REFERENCES tags(id) ON DELETE CASCADE,
+            created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(note_id, tag_id)
         );
         """
 
@@ -142,15 +164,37 @@ class DatabaseManager:
         CREATE INDEX IF NOT EXISTS idx_app_users_email ON app_users(email);
         """
 
+        create_tags_user_index = """
+        CREATE INDEX IF NOT EXISTS idx_tags_user_id ON tags(user_id);
+        """
+
+        create_note_tags_note_index = """
+        CREATE INDEX IF NOT EXISTS idx_note_tags_note_id ON note_tags(note_id);
+        """
+
+        create_note_tags_tag_index = """
+        CREATE INDEX IF NOT EXISTS idx_note_tags_tag_id ON note_tags(tag_id);
+        """
+
+        create_notes_date_index = """
+        CREATE INDEX IF NOT EXISTS idx_notes_note_date ON notes(note_date);
+        """
+
         conn = self.get_connection()
         if conn:
             try:
                 with conn.cursor() as cursor:
                     cursor.execute(create_app_users_table)
                     cursor.execute(create_notes_table)
+                    cursor.execute(create_tags_table)
+                    cursor.execute(create_note_tags_table)
                     cursor.execute(create_sent_emails_table)
                     cursor.execute(create_username_index)
                     cursor.execute(create_email_index)
+                    cursor.execute(create_tags_user_index)
+                    cursor.execute(create_note_tags_note_index)
+                    cursor.execute(create_note_tags_tag_index)
+                    cursor.execute(create_notes_date_index)
                     conn.commit()
                     return True
             except psycopg2.Error as e:
@@ -353,8 +397,47 @@ class DatabaseManager:
                 conn.close()
         return False
 
+    def save_note_with_tag(self, user_id: int, content: str, note_date: str = None, tag_id: int = None) -> Optional[int]:
+        """Save a new note with optional date and tag."""
+        conn = self.get_connection()
+        if conn:
+            try:
+                with conn.cursor() as cursor:
+                    # Insert the note
+                    if note_date:
+                        cursor.execute("""
+                            INSERT INTO notes (user_id, content, note_date)
+                            VALUES (%s, %s, %s)
+                            RETURNING id
+                        """, (user_id, content, note_date))
+                    else:
+                        cursor.execute("""
+                            INSERT INTO notes (user_id, content)
+                            VALUES (%s, %s)
+                            RETURNING id
+                        """, (user_id, content))
+
+                    note_id = cursor.fetchone()[0]
+
+                    # Add tag association if provided
+                    if tag_id:
+                        cursor.execute("""
+                            INSERT INTO note_tags (note_id, tag_id)
+                            VALUES (%s, %s)
+                        """, (note_id, tag_id))
+
+                    conn.commit()
+                    return note_id
+            except psycopg2.Error as e:
+                st.error(f"Error saving note with tag: {e}")
+                conn.rollback()
+                return None
+            finally:
+                conn.close()
+        return None
+
     def get_weekly_notes(self, user_id: int) -> List[Dict]:
-        """Get notes for the current week for a specific user."""
+        """Get notes for the current week for a specific user with tag information."""
         # Calculate the start of the current week (Monday)
         today = datetime.now().date()
         days_since_monday = today.weekday()
@@ -366,16 +449,99 @@ class DatabaseManager:
             try:
                 with conn.cursor(cursor_factory=RealDictCursor) as cursor:
                     cursor.execute("""
-                        SELECT content, created_at
-                        FROM notes
-                        WHERE user_id = %s
-                        AND DATE(created_at) BETWEEN %s AND %s
-                        ORDER BY created_at DESC
+                        SELECT n.id, n.content, n.note_date, n.created_at,
+                               t.id as tag_id, t.name as tag_name, t.color as tag_color
+                        FROM notes n
+                        LEFT JOIN note_tags nt ON n.id = nt.note_id
+                        LEFT JOIN tags t ON nt.tag_id = t.id
+                        WHERE n.user_id = %s
+                        AND n.note_date BETWEEN %s AND %s
+                        ORDER BY n.note_date DESC, n.created_at DESC
                     """, (user_id, week_start, week_end))
-                    notes = cursor.fetchall()
-                    return [dict(note) for note in notes]
+                    rows = cursor.fetchall()
+
+                    # Group notes and their tags
+                    notes_dict = {}
+                    for row in rows:
+                        note_id = row['id']
+                        if note_id not in notes_dict:
+                            notes_dict[note_id] = {
+                                'id': row['id'],
+                                'content': row['content'],
+                                'note_date': row['note_date'],
+                                'created_at': row['created_at'],
+                                'tags': []
+                            }
+
+                        if row['tag_id']:
+                            notes_dict[note_id]['tags'].append({
+                                'id': row['tag_id'],
+                                'name': row['tag_name'],
+                                'color': row['tag_color']
+                            })
+
+                    return list(notes_dict.values())
             except psycopg2.Error as e:
                 st.error(f"Error fetching weekly notes: {e}")
+                return []
+            finally:
+                conn.close()
+        return []
+
+    def get_notes_with_tags(self, user_id: int, tag_id: int = None, limit: int = 50) -> List[Dict]:
+        """Get notes for a user, optionally filtered by tag."""
+        conn = self.get_connection()
+        if conn:
+            try:
+                with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                    if tag_id:
+                        cursor.execute("""
+                            SELECT n.id, n.content, n.note_date, n.created_at,
+                                   t.id as tag_id, t.name as tag_name, t.color as tag_color
+                            FROM notes n
+                            INNER JOIN note_tags nt ON n.id = nt.note_id
+                            INNER JOIN tags t ON nt.tag_id = t.id
+                            WHERE n.user_id = %s AND t.id = %s
+                            ORDER BY n.note_date DESC, n.created_at DESC
+                            LIMIT %s
+                        """, (user_id, tag_id, limit))
+                    else:
+                        cursor.execute("""
+                            SELECT n.id, n.content, n.note_date, n.created_at,
+                                   t.id as tag_id, t.name as tag_name, t.color as tag_color
+                            FROM notes n
+                            LEFT JOIN note_tags nt ON n.id = nt.note_id
+                            LEFT JOIN tags t ON nt.tag_id = t.id
+                            WHERE n.user_id = %s
+                            ORDER BY n.note_date DESC, n.created_at DESC
+                            LIMIT %s
+                        """, (user_id, limit))
+
+                    rows = cursor.fetchall()
+
+                    # Group notes and their tags
+                    notes_dict = {}
+                    for row in rows:
+                        note_id = row['id']
+                        if note_id not in notes_dict:
+                            notes_dict[note_id] = {
+                                'id': row['id'],
+                                'content': row['content'],
+                                'note_date': row['note_date'],
+                                'created_at': row['created_at'],
+                                'tags': []
+                            }
+
+                        if row['tag_id']:
+                            notes_dict[note_id]['tags'].append({
+                                'id': row['tag_id'],
+                                'name': row['tag_name'],
+                                'color': row['tag_color']
+                            })
+
+                    return list(notes_dict.values())
+            except psycopg2.Error as e:
+                st.error(f"Error fetching notes with tags: {e}")
                 return []
             finally:
                 conn.close()
@@ -402,20 +568,44 @@ class DatabaseManager:
         return None
 
     def get_all_notes_for_user(self, user_id: int, limit: int = 50) -> List[Dict]:
-        """Get all notes for a user with optional limit."""
+        """Get all notes for a user with optional limit, including tag information."""
         conn = self.get_connection()
         if conn:
             try:
                 with conn.cursor(cursor_factory=RealDictCursor) as cursor:
                     cursor.execute("""
-                        SELECT content, created_at
-                        FROM notes
-                        WHERE user_id = %s
-                        ORDER BY created_at DESC
+                        SELECT n.id, n.content, n.note_date, n.created_at,
+                               t.id as tag_id, t.name as tag_name, t.color as tag_color
+                        FROM notes n
+                        LEFT JOIN note_tags nt ON n.id = nt.note_id
+                        LEFT JOIN tags t ON nt.tag_id = t.id
+                        WHERE n.user_id = %s
+                        ORDER BY n.note_date DESC, n.created_at DESC
                         LIMIT %s
                     """, (user_id, limit))
-                    notes = cursor.fetchall()
-                    return [dict(note) for note in notes]
+                    rows = cursor.fetchall()
+
+                    # Group notes and their tags
+                    notes_dict = {}
+                    for row in rows:
+                        note_id = row['id']
+                        if note_id not in notes_dict:
+                            notes_dict[note_id] = {
+                                'id': row['id'],
+                                'content': row['content'],
+                                'note_date': row['note_date'],
+                                'created_at': row['created_at'],
+                                'tags': []
+                            }
+
+                        if row['tag_id']:
+                            notes_dict[note_id]['tags'].append({
+                                'id': row['tag_id'],
+                                'name': row['tag_name'],
+                                'color': row['tag_color']
+                            })
+
+                    return list(notes_dict.values())
             except psycopg2.Error as e:
                 st.error(f"Error fetching user notes: {e}")
                 return []
@@ -534,6 +724,195 @@ class DatabaseManager:
             finally:
                 conn.close()
         return False
+
+    # Tag management methods
+    def get_user_tags(self, user_id: int) -> List[Dict]:
+        """Get all tags for a specific user."""
+        conn = self.get_connection()
+        if conn:
+            try:
+                with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                    cursor.execute("""
+                        SELECT id, name, color, created_at
+                        FROM tags
+                        WHERE user_id = %s
+                        ORDER BY name
+                    """, (user_id,))
+                    tags = cursor.fetchall()
+                    return [dict(tag) for tag in tags]
+            except psycopg2.Error as e:
+                st.error(f"Error fetching user tags: {e}")
+                return []
+            finally:
+                conn.close()
+        return []
+
+    def create_tag(self, user_id: int, name: str, color: str = '#1f77b4') -> Optional[int]:
+        """Create a new tag for a user."""
+        conn = self.get_connection()
+        if conn:
+            try:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                        INSERT INTO tags (user_id, name, color)
+                        VALUES (%s, %s, %s)
+                        RETURNING id
+                    """, (user_id, name.strip(), color))
+                    tag_id = cursor.fetchone()[0]
+                    conn.commit()
+                    return tag_id
+            except psycopg2.IntegrityError:
+                # Tag name already exists for this user
+                conn.rollback()
+                return None
+            except psycopg2.Error as e:
+                st.error(f"Error creating tag: {e}")
+                conn.rollback()
+                return None
+            finally:
+                conn.close()
+        return None
+
+    def delete_tag(self, user_id: int, tag_id: int) -> bool:
+        """Delete a tag (only if it belongs to the user)."""
+        conn = self.get_connection()
+        if conn:
+            try:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                        DELETE FROM tags
+                        WHERE id = %s AND user_id = %s
+                    """, (tag_id, user_id))
+                    conn.commit()
+                    return cursor.rowcount > 0
+            except psycopg2.Error as e:
+                st.error(f"Error deleting tag: {e}")
+                conn.rollback()
+                return False
+            finally:
+                conn.close()
+        return False
+
+    def create_default_tags(self, user_id: int) -> bool:
+        """Create default tags for a new user."""
+        default_tags = [
+            {"name": "Professional", "color": "#1f77b4"},
+            {"name": "Personal", "color": "#ff7f0e"},
+            {"name": "Learning", "color": "#2ca02c"}
+        ]
+
+        success_count = 0
+        for tag_data in default_tags:
+            tag_id = self.create_tag(user_id, tag_data["name"], tag_data["color"])
+            if tag_id:
+                success_count += 1
+
+        return success_count > 0
+
+    def update_note_with_tag(self, note_id: int, user_id: int, content: str = None, note_date: str = None, tag_id: int = None) -> bool:
+        """Update an existing note with new content, date, and/or tag."""
+        conn = self.get_connection()
+        if conn:
+            try:
+                with conn.cursor() as cursor:
+                    # First verify the note belongs to the user
+                    cursor.execute("""
+                        SELECT id FROM notes WHERE id = %s AND user_id = %s
+                    """, (note_id, user_id))
+
+                    if not cursor.fetchone():
+                        return False  # Note doesn't exist or doesn't belong to user
+
+                    # Update note content and/or date if provided
+                    update_parts = []
+                    update_values = []
+
+                    if content is not None:
+                        update_parts.append("content = %s")
+                        update_values.append(content)
+
+                    if note_date is not None:
+                        update_parts.append("note_date = %s")
+                        update_values.append(note_date)
+
+                    if update_parts:
+                        update_values.extend([note_id, user_id])
+                        cursor.execute(f"""
+                            UPDATE notes
+                            SET {', '.join(update_parts)}
+                            WHERE id = %s AND user_id = %s
+                        """, update_values)
+
+                    # Handle tag association
+                    if tag_id is not None:
+                        # Remove existing tag associations for this note
+                        cursor.execute("""
+                            DELETE FROM note_tags WHERE note_id = %s
+                        """, (note_id,))
+
+                        # Add new tag association if tag_id > 0
+                        if tag_id > 0:
+                            cursor.execute("""
+                                INSERT INTO note_tags (note_id, tag_id)
+                                VALUES (%s, %s)
+                                ON CONFLICT (note_id, tag_id) DO NOTHING
+                            """, (note_id, tag_id))
+
+                    conn.commit()
+                    return True
+
+            except psycopg2.Error as e:
+                st.error(f"Error updating note: {e}")
+                conn.rollback()
+                return False
+            finally:
+                conn.close()
+        return False
+
+    def get_note_by_id(self, note_id: int, user_id: int) -> Optional[Dict]:
+        """Get a specific note by ID (only if it belongs to the user)."""
+        conn = self.get_connection()
+        if conn:
+            try:
+                with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                    cursor.execute("""
+                        SELECT n.id, n.content, n.note_date, n.created_at,
+                               t.id as tag_id, t.name as tag_name, t.color as tag_color
+                        FROM notes n
+                        LEFT JOIN note_tags nt ON n.id = nt.note_id
+                        LEFT JOIN tags t ON nt.tag_id = t.id
+                        WHERE n.id = %s AND n.user_id = %s
+                    """, (note_id, user_id))
+
+                    rows = cursor.fetchall()
+                    if not rows:
+                        return None
+
+                    # Build note with tags
+                    note = {
+                        'id': rows[0]['id'],
+                        'content': rows[0]['content'],
+                        'note_date': rows[0]['note_date'],
+                        'created_at': rows[0]['created_at'],
+                        'tags': []
+                    }
+
+                    for row in rows:
+                        if row['tag_id']:
+                            note['tags'].append({
+                                'id': row['tag_id'],
+                                'name': row['tag_name'],
+                                'color': row['tag_color']
+                            })
+
+                    return note
+
+            except psycopg2.Error as e:
+                st.error(f"Error fetching note: {e}")
+                return None
+            finally:
+                conn.close()
+        return None
 
 
 
