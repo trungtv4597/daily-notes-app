@@ -1,19 +1,47 @@
-# Daily Notes App
+# Performance Emailer - Daily Notes App
 
-A well-organized Streamlit web application for logging daily accomplishments and tracking progress throughout the week. This project follows the cookiecutter-streamlit template structure for maintainable and scalable code organization.
+A comprehensive Streamlit web application for logging daily accomplishments, organizing notes with tags, and generating professional performance emails. This project features a modern multi-page architecture with advanced note management capabilities.
 
-## Features
+## ✨ Latest Features (v2.0)
 
-- 👤 User selection and management
-- ✍️ Daily note entry with rich text area
-- 📅 Weekly notes display for the current week
-- 📊 Analytics dashboard with user statistics
-- ⚙️ Settings page for user and app management
-- 🔒 Secure database connection with AWS RDS PostgreSQL
-- ✅ Input validation and error handling
-- 📱 Responsive web interface with custom styling
-- 🧪 Comprehensive test suite
-- 🎨 Custom CSS styling and theming
+### 🏷️ Advanced Tagging System
+- **Custom tags** with personalized names and colors
+- **Tag-based organization** for better note categorization
+- **Visual tag indicators** with color-coded display
+- **Default tags** (Professional, Personal, Learning) for quick setup
+- **Tag management** in Settings with create/delete functionality
+
+### ✏️ Individual Note Editing
+- **Edit any note** with inline editing forms
+- **Update dates and tags** for existing notes
+- **Content modification** without losing note history
+- **Save/Cancel functionality** with real-time updates
+
+### 📅 Enhanced Date Management
+- **Custom date selection** for notes (not just current timestamp)
+- **Date range filtering** - All time, This week, This month, Custom range
+- **Backward compatibility** with existing notes
+- **Smart date handling** with fallback to creation date
+
+### 🏠 Restructured Application
+- **Dedicated Home page** with welcome, stats, and navigation
+- **Focused Notes page** with all note functionality
+- **Enhanced Analytics** with comprehensive insights
+- **Organized navigation** with clear page purposes
+
+## Core Features
+
+- � **User authentication** and session management
+- 📝 **Rich note creation** with date and tag selection
+- 🔍 **Advanced filtering** by date range and tags
+- ✏️ **Individual note editing** with full form support
+- 📊 **Analytics dashboard** with usage statistics and charts
+- ⚙️ **Settings management** for profile and tags
+- 🧾 **AI-powered email generation** for performance summaries
+- 🔒 **Secure database** connection with PostgreSQL
+- ✅ **Input validation** and comprehensive error handling
+- 📱 **Responsive design** with custom styling
+- 🧪 **Comprehensive test suite** with 13+ test cases
 
 ## Prerequisites
 
@@ -80,10 +108,16 @@ DB_PORT = "5432"
 - Update your local secrets.toml and keep it private for both local development and deployment
 
 ### 4. Initialize Database
-Run the database initialization script to create tables and populate sample users:
+For new installations, run the database initialization script:
 ```bash
 python archive/init_database.py
 ```
+
+For existing installations upgrading to v2.0, run the tagging migration:
+```bash
+python archive/migrate_add_tagging.py
+```
+This will add the new tagging tables and update existing notes with proper date fields.
 
 ### 5. Run the Application
 Start the Streamlit application:
@@ -95,22 +129,37 @@ The application will be available at `http://localhost:8501`
 
 ## Usage
 
-### Main Page (Home)
-1. **Select User**: Choose a user from the dropdown menu
-2. **Write Note**: Enter your daily accomplishments in the text area
-3. **Save Note**: Click the "Save Note" button to store your entry
-4. **View Weekly Notes**: See all notes for the current week in the display area
+### 🏠 Home Page
+- **Welcome dashboard** with user statistics and quick metrics
+- **Feature highlights** showing latest updates and coming features
+- **Navigation guide** with clear descriptions of each page
+- **Quick action buttons** to jump directly to key functionality
+- **Tips & help sections** with expandable guides for getting started
 
-### Analytics Page
-- View user statistics and note counts
-- See visual charts of user activity
-- Monitor application usage patterns
+### 📝 Notes Page
+1. **Create Notes**: Select date and tag, then write your accomplishments
+2. **Filter Notes**: Use date range (All time, This week, This month, Custom) and tag filters
+3. **View Notes**: Browse all your notes with visual tag indicators
+4. **Edit Notes**: Click the ✏️ Edit button on any note to modify content, date, or tags
+5. **Save Changes**: Use the inline editing form with Save/Cancel options
 
-### Settings Page
-- Add new users to the system
-- Manage existing users
-- Configure application settings
-- Test database connectivity
+### 🧾 Summary Page
+- **Generate performance emails** using AI from your notes
+- **Filter by date range** to create targeted summaries
+- **Choose email tone** (professional, friendly, confident)
+- **Review and edit** before sending to your manager
+
+### 📊 Analytics Page
+- **Comprehensive statistics** including total notes, tagged notes, and activity metrics
+- **Tag usage analysis** with charts showing most used tags
+- **Activity timeline** displaying note creation patterns over time
+- **Content insights** with word counts and averages per note
+
+### ⚙️ Settings Page
+- **Email configuration** for manager name and email address
+- **Tag management** with create, delete, and color customization
+- **Default tag creation** for new users (Professional, Personal, Learning)
+- **Visual tag preview** with color-coded display
 
 ## Project Structure
 
@@ -121,7 +170,8 @@ performance-emailer/
 ├── archive/                  # Archived scripts and documentation
 │   ├── README.md            # Archive documentation
 │   ├── init_database.py     # Database initialization script
-│   ├── migrate_to_simple_auth.py # Migration script (one-time use)
+│   ├── migrate_add_tagging.py # Tagging system migration script
+│   ├── migrate_to_simple_auth.py # Auth migration script (one-time use)
 │   ├── test_simple_auth.py  # Standalone authentication test
 │   ├── run_tests.py         # Test runner utility
 │   └── SIMPLE_AUTH_GUIDE.md # Implementation guide
@@ -133,12 +183,15 @@ performance-emailer/
 ├── output/                   # Generated output files
 │   └── README.md
 ├── pages/                    # Multi-page app pages
-│   ├── 1_📊_Analytics.py    # Analytics dashboard
-│   └── 2_⚙️_Settings.py     # Settings and user management
+│   ├── 0_🧾_Summary.py      # AI-powered email generation
+│   ├── 1_📝_Notes.py        # Note creation, editing, and management
+│   ├── 2_📊_Analytics.py    # Statistics and insights dashboard
+│   └── 3_⚙️_Settings.py     # Profile and tag management
 ├── src/                      # Source code
 │   ├── components/          # Reusable components
 │   │   ├── __init__.py
-│   │   └── database.py      # Database operations
+│   │   ├── auth_ui.py       # Authentication components
+│   │   └── database.py      # Database operations with tagging support
 │   ├── calculations/        # Utility functions
 │   │   ├── __init__.py
 │   │   └── utils.py         # Validation and utilities
@@ -146,28 +199,61 @@ performance-emailer/
 ├── tests/                    # Test suite
 │   ├── __init__.py
 │   ├── test_database.py     # Database tests
+│   ├── test_tagging_system.py # Tagging system tests (13 test cases)
 │   └── test_utils.py        # Utility function tests
 ├── .streamlit/              # Streamlit configuration
 │   ├── config.toml          # App configuration
 │   └── secrets.toml         # Centralized secrets (not in git)
-├── app.py                   # Main Streamlit application
+├── app.py                   # Home page with welcome and navigation
 ├── requirements.txt         # Python dependencies
 ├── .gitignore              # Git ignore file
+├── TAGGING_FEATURE_GUIDE.md # Comprehensive tagging system documentation
 └── README.md               # This file
 ```
 
 ## Database Schema
 
-### Users Table
+### App Users Table (`app_users`)
 - `id` (SERIAL PRIMARY KEY)
-- `name` (VARCHAR(100) NOT NULL UNIQUE)
+- `username` (VARCHAR(50) NOT NULL UNIQUE)
+- `display_name` (VARCHAR(100) NOT NULL)
+- `email` (VARCHAR(255))
+- `manager_name` (VARCHAR(100)) - For email generation
+- `manager_email` (VARCHAR(255)) - For email generation
 - `created_at` (TIMESTAMP WITHOUT TIME ZONE)
 
-### Notes Table
+### Notes Table (`notes`)
 - `id` (SERIAL PRIMARY KEY)
-- `user_id` (INTEGER REFERENCES users(id))
+- `user_id` (INTEGER REFERENCES app_users(id))
 - `content` (TEXT NOT NULL)
+- `note_date` (DATE DEFAULT CURRENT_DATE) - Custom date selection
 - `created_at` (TIMESTAMP WITHOUT TIME ZONE)
+
+### Tags Table (`tags`)
+- `id` (SERIAL PRIMARY KEY)
+- `user_id` (INTEGER REFERENCES app_users(id))
+- `name` (VARCHAR(50) NOT NULL)
+- `color` (VARCHAR(7) DEFAULT '#1f77b4') - Hex color code
+- `created_at` (TIMESTAMP WITHOUT TIME ZONE)
+- `UNIQUE(user_id, name)` - Unique tag names per user
+
+### Note Tags Junction Table (`note_tags`)
+- `id` (SERIAL PRIMARY KEY)
+- `note_id` (INTEGER REFERENCES notes(id) ON DELETE CASCADE)
+- `tag_id` (INTEGER REFERENCES tags(id) ON DELETE CASCADE)
+- `created_at` (TIMESTAMP WITHOUT TIME ZONE)
+- `UNIQUE(note_id, tag_id)` - One tag per note (expandable to multiple)
+
+### Sent Emails Table (`sent_emails`)
+- `id` (SERIAL PRIMARY KEY)
+- `user_id` (INTEGER REFERENCES app_users(id))
+- `to_email` (VARCHAR(255) NOT NULL)
+- `subject` (TEXT NOT NULL)
+- `body` (TEXT NOT NULL)
+- `status` (VARCHAR(32) DEFAULT 'queued')
+- `error_message` (TEXT)
+- `created_at` (TIMESTAMP WITHOUT TIME ZONE)
+- `updated_at` (TIMESTAMP WITHOUT TIME ZONE)
 
 ## Security Features
 
@@ -219,6 +305,12 @@ pytest -v
 ### Test Structure
 - `tests/test_utils.py` - Tests for utility functions
 - `tests/test_database.py` - Tests for database operations
+- `tests/test_tagging_system.py` - Comprehensive tagging system tests (13 test cases)
+  - Tag creation and validation
+  - Note saving with tags
+  - Individual note editing
+  - Tag filtering and retrieval
+  - Error handling and edge cases
 
 ## Development
 
@@ -256,17 +348,41 @@ The `archive/` folder contains one-time run scripts, migration scripts, and docu
 
 These scripts were moved to the archive to keep the root directory clean while preserving them for future reference or maintenance tasks.
 
+## Recent Implementations ✅
+
+- ✅ **User authentication and session management** - Complete with secure login system
+- ✅ **Individual note editing capabilities** - Full inline editing with date and tag updates
+- ✅ **Advanced search and filter functionality** - Date range and tag-based filtering
+- ✅ **Tagging system** - Custom tags with colors and organization
+- ✅ **Enhanced data visualization** - Analytics dashboard with charts and insights
+- ✅ **Multi-page architecture** - Organized navigation with dedicated functionality pages
+
 ## Future Enhancements
 
-- User authentication and registration
-- Note editing and deletion capabilities
-- Export notes to PDF or CSV
-- Search and filter functionality
-- Rich text formatting
-- Email notifications
-- Data visualization improvements
+- **Multiple tags per note** - Expand from single tag to multiple tag support
+- **Bulk note operations** - Edit multiple notes simultaneously
+- **Export functionality** - Export notes to PDF, CSV, or other formats
+- **Rich text formatting** - Enhanced text editor with formatting options
+- **Email notifications** - Automated reminders and summaries
+- **Advanced analytics** - More detailed insights and reporting
+- **Mobile app** - Native mobile application
+- **Team collaboration** - Share notes and collaborate with team members
+- **Integration APIs** - Connect with other productivity tools
 
+## Current Development Status
 
-## Backlog
+### ✅ Completed (v2.0)
+- Advanced tagging system with colors and management
+- Individual note editing with inline forms
+- Date range filtering and custom date selection
+- Restructured multi-page application architecture
+- Comprehensive analytics dashboard
+- Enhanced user interface and navigation
 
-- Email sending from Summary page (implemented draft → confirm recipient → persist approved email → SMTP send → success/fail feedback). Paused for now while SMTP configuration and delivery paths are finalized.
+### 🔄 In Progress
+- Email sending from Summary page (implemented draft → confirm recipient → persist approved email → SMTP send → success/fail feedback). Paused while SMTP configuration and delivery paths are finalized.
+
+### 📋 Planned
+- Multiple tags per note support
+- Bulk editing operations
+- Enhanced mobile responsiveness
