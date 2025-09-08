@@ -26,10 +26,12 @@ def validate_note_content(content: str) -> Tuple[bool, str]:
         return False, "Note cannot exceed 5000 characters."
     
     # Check for potentially harmful content (basic XSS prevention)
+    # More precise patterns to avoid false positives with Markdown
     dangerous_patterns = [
-        r'<script.*?>.*?</script>',
-        r'javascript:',
-        r'on\w+\s*=',
+        r'<script.*?>.*?</script>',  # Script tags
+        r'javascript:',              # JavaScript URLs
+        r'<[^>]*\son\w+\s*=',       # HTML event handlers (onclick, onload, etc.) within tags
+        r'\bon\w+\s*=\s*["\'][^"\']*["\']',  # Standalone event handlers with quotes
     ]
     
     for pattern in dangerous_patterns:

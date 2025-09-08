@@ -61,6 +61,43 @@ class TestValidateNoteContent(unittest.TestCase):
         self.assertFalse(is_valid)
         self.assertEqual(error_message, "Note contains potentially harmful content.")
 
+    def test_markdown_content_should_be_valid(self):
+        """Test that common Markdown patterns are not flagged as harmful."""
+        # Test cases that were previously causing false positives
+        markdown_examples = [
+            "Configuration = something important",
+            "The reason = we need to fix this",
+            "function = lambda x: x + 1",
+            "# Heading\n\n**Bold text** and *italic*\n\n- List item\n- Another item",
+            "```python\ncode_block = 'this should work'\n```",
+            "Link: [text](https://example.com)",
+            "Image: ![alt](image.png)",
+            "> Blockquote text",
+            "| Table | Header |\n|-------|--------|\n| Cell  | Data   |"
+        ]
+
+        for markdown_text in markdown_examples:
+            with self.subTest(markdown=markdown_text[:50] + "..."):
+                is_valid, error_message = validate_note_content(markdown_text)
+                self.assertTrue(is_valid, f"Markdown content should be valid: {markdown_text[:50]}...")
+                self.assertEqual(error_message, "")
+
+    def test_actual_dangerous_event_handlers(self):
+        """Test that actual dangerous HTML event handlers are still caught."""
+        dangerous_examples = [
+            '<div onclick="alert(1)">Click me</div>',
+            '<img onload="malicious()">',
+            '<body onmouseover="hack()">',
+            'onsubmit="steal_data()"',
+            'ONCLICK="ALERT(1)"'  # Case insensitive
+        ]
+
+        for dangerous_text in dangerous_examples:
+            with self.subTest(dangerous=dangerous_text):
+                is_valid, error_message = validate_note_content(dangerous_text)
+                self.assertFalse(is_valid, f"Dangerous content should be invalid: {dangerous_text}")
+                self.assertEqual(error_message, "Note contains potentially harmful content.")
+
 
 class TestSanitizeInput(unittest.TestCase):
     """Test cases for sanitize_input function."""

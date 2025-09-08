@@ -121,22 +121,29 @@ def display_edit_form(note, user_id, edit_key):
     
     # Handle form submission
     if save_clicked:
-        try:
-            success = db_manager.update_note_with_tag(
-                note['id'],
-                user_id,
-                new_content,
-                new_date.isoformat(),
-                selected_tag_id
-            )
-            if success:
-                st.success("✅ Note updated successfully!")
-                st.session_state[edit_key] = False
-                st.rerun()
-            else:
-                st.error("❌ Failed to update note.")
-        except Exception as e:
-            st.error(f"❌ Error updating note: {format_error_message(e)}")
+        # Sanitize and validate input
+        sanitized_content = sanitize_input(new_content)
+        is_valid, error_message = validate_note_content(sanitized_content)
+
+        if not is_valid:
+            st.error(f"⚠️ {error_message}")
+        else:
+            try:
+                success = db_manager.update_note_with_tag(
+                    note['id'],
+                    user_id,
+                    sanitized_content,
+                    new_date.isoformat(),
+                    selected_tag_id
+                )
+                if success:
+                    st.success("✅ Note updated successfully!")
+                    st.session_state[edit_key] = False
+                    st.rerun()
+                else:
+                    st.error("❌ Failed to update note.")
+            except Exception as e:
+                st.error(f"❌ Error updating note: {format_error_message(e)}")
     
     if cancel_clicked:
         st.session_state[edit_key] = False
